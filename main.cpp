@@ -22,17 +22,34 @@ Options o(default_n, default_h, default_eps);
 
 vector<string> split(string str, char delimiter);
 Dipole initDipole(const string& filename);
-Dipole updatePositions(const Dipole& freeDipole, Event& event,
+Dipole doSimulation(const Dipole& freeDipole, Event& event,
                        double h,
                        const int numEvents);
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    cerr << "Usage: MagPhyx [-n numSteps] [-h h] [-e eps] filename.csv" << endl;
-    cerr << "  -n length of the simulation, in the form of number of events. "
-         << "Default = 1e5" << endl;
-    cerr << "  -h initial step size. Default = 1e-2" << endl;
-    cerr << "  -e error per step allowed. Default = 1e-10" << endl;
+    fprintf(stderr, "\n");
+    fprintf(stderr, "SYNOPSIS\n");
+    fprintf(stderr, "\tmagphyx [OPTIONS] filename.csv\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "DESCRIPTION\n");
+    fprintf(stderr, "\tmagphyx runs a magnet simulation given initial\n"
+            "\tconditions specified in the second line of filename.csv.\n"
+            "\tfilename.csv is the same format as what is exported from\n"
+            "\tMagPhyx web version. Events are output to events.csv.\n"
+            );
+    fprintf(stderr, "\n");
+    fprintf(stderr, "OPTIONS\n");
+    fprintf(stderr, "\t-n numEvents\n");
+    fprintf(stderr, "\t\tExecutes the simulation until numEvents events "
+            "occur. Default = 1e5.\n");
+    fprintf(stderr, "\t-h h\n");
+    fprintf(stderr, "\t\tInitial step size. Default = 1e-2.\n");
+    fprintf(stderr, "\t-e eps\n");
+    fprintf(stderr, "\t\tError per step allowed. Note that this is error in\n"
+            "\t\tterms of Runge-Kutta. The error in total energy will be\n"
+            "\t\tsimilar to, but not bound by, this value. Default = 1e-10.\n");
+    fprintf(stderr, "\n");
     return 1;
   }
 
@@ -49,7 +66,7 @@ int main(int argc, char** argv) {
   Dipole freeDipole = initDipole(initFilename);
   // cout << freeDipole << endl;
   Event event("events.csv", freeDipole);
-  freeDipole = updatePositions(freeDipole, event, o.h, o.numEvents);
+  freeDipole = doSimulation(freeDipole, event, o.h, o.numEvents);
   // cout << freeDipole << endl;
 }
 
@@ -101,61 +118,50 @@ vector<string> split(string str, char delimiter) {
   return internal;
 }
 
-void printStatusHeader() {
-  // printf(" %5s %12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
-  //        "i", "h", "r", "theta", "phi", "pr", "ptheta", "pphi", "E", "dE");
+void printStateHeader() {
   printf("\n");
-  printf(" %5s %12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
+  printf(" %9s %12s %12s %12s %12s %12s %12s %12s %12s %12s\n",
          "t", "h", "r", "theta", "phi", "pr", "ptheta", "pphi", "E", "dE");
-  printf("-----------------------------------------"
-         "-----------------------------------------"
-         "------------------------------------------\n");
+  printf("-------------------------------------------"
+         "-------------------------------------------"
+         "--------------------------------------------\n");
 }
 
-void printStatus(const int i, const double t, const double h, const Dipole& d,
-                 const int numSteps, const bool forcePrint = false) {
-  const int n = (int)ceil(numSteps/20.0);
-  if (i % n == 0 || forcePrint) {
-    // printf("%s%5d %12.6g %12.5g %12.6g %12.6g %12.6g"
-    //        "%12.6g %12.6g %12.6g %12.6g\n",
-    printf("%s%5.0lf %12.6g %12.5g %12.6g %12.6g %12.6g"
-           "%12.6g %12.6g %12.6g %12.6g\n",
-        // (forcePrint?"*":" "), i, h,
-        (forcePrint?"*":" "), t, h,
-        d.get_r(), Physics::rad2deg(d.get_theta()),
-        Physics::rad2deg(d.get_phi()),
-        d.get_pr(), d.get_ptheta(), d.get_pphi(),
-        d.get_E(), d.get_dE());
-  }
+void printState(const double t, const double h, const Dipole& d,
+                const char prefix = ' ') {
+  printf("%c%9.0lf %12.6g %12.5g %12.6g %12.6g %12.6g"
+         "%12.6g %12.6g %12.6g %12.6g\n",
+         prefix, t, h,
+         d.get_r(), Physics::rad2deg(d.get_theta()),
+         Physics::rad2deg(d.get_phi()),
+         d.get_pr(), d.get_ptheta(), d.get_pphi(),
+         d.get_E(), d.get_dE());
 }
 
-void printStatus(const Event& event, const bool fired) {
-  if (event.get_n() % 1000 == 0 && fired) {
-    printf("\b\b\b\b\b\b\b%-7d", event.get_n());
+void printProgress(const int n, const Dipole& d, const bool fired) {
+  if (n % 1000 == 0 && fired) {
+    printf("\r");
+    printf("Num events = %-7d     dE = %-12e     ", n, d.get_dE());
     fflush(stdout);
   }
 }
 
-Dipole updatePositions(const Dipole& freeDipole, Event& event,
+Dipole doSimulation(const Dipole& freeDipole, Event& event,
                        const double h_,
                        const int numEvents) {
   Stepper stepper(freeDipole, h_, o.eps);
 
-  // Dipole d(freeDipole);
   double t = 0.0;
-  // double h = o.h;
 
   int n = 0;
-  // printStatusHeader();
-  // printStatus(0, 0, stepper.h, stepper.d, numEvents);
 
-  printf("\n# events = %-7d", 0);
+  printf("\n");
+  printProgress(0, freeDipole, true);
   for (int i = 0; event.get_n() < numEvents; ++i) {
-  // for (int i = 0; i < 10000; ++i) {
     try {
       stepper.step();
     } catch (logic_error& e) {
-      printStatus(i, stepper.t, stepper.h, stepper.d, numEvents);
+      printState(stepper.t, stepper.h, stepper.d);
       throw e;
     }
 
@@ -176,26 +182,26 @@ Dipole updatePositions(const Dipole& freeDipole, Event& event,
       }
 
       event.logCollision(stepper.d, stepper.t);
-      printStatus(event, true);
+      printProgress(event.get_n(), stepper.d, true);
       // Specular reflection
       stepper.d.set_pr(-stepper.d.get_pr());
 
       stepper.reset();
     } else {
       const bool fired = event.log(stepper.d, stepper.t);
-      // printStatus(i, t, h, d, numEvents);
-      printStatus(event, fired);
+      printProgress(event.get_n(), stepper.d, fired);
       ++n;
     }
   }
 
-  printStatusHeader();
-  printStatus(0, 0, h_, freeDipole, numEvents);
-  printStatus(0, 0, stepper.h, stepper.d, numEvents);
+  printf("\n");
+  // printStateHeader();
+  // printState(0, h_, freeDipole);
+  // printState(stepper.t, stepper.h, stepper.d);
 
   printf("\n");
-  printf("Num events = %d\n", event.get_n());
-  // printf("Num steps = %d\n", n);
+  printf("Results output to events.csv.\n");
+  printf("\n");
 
   return freeDipole;
 }

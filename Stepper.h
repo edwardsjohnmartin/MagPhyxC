@@ -30,11 +30,7 @@ class Stepper {
     const gsl_odeiv2_step_type* step_type = gsl_odeiv2_step_rk8pd;
     // const gsl_odeiv2_step_type* step_type = gsl_odeiv2_step_bsimp;
  
-    // gsl_odeiv2_system sys = {func, jac, 6, params};
-    sys.function = func;
-    sys.jacobian = jac;
-    sys.dimension = 6;
-    sys.params = 0;
+    sys = { func, jac, 6, 0 };
 
     _step = gsl_odeiv2_step_alloc(step_type, 6);
     control = gsl_odeiv2_control_standard_new(eps_abs, eps_rel, a_y, a_dydt);
