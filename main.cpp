@@ -15,44 +15,59 @@
 
 using namespace std;
 
+const Options::Dynamics default_dynamics = Options::BOUNCING;
 const double default_n = 1e5;
 const double default_h = 1e-2;
 const double default_eps = 1e-10;
-Options o(default_n, default_h, default_eps);
 
-vector<string> split(string str, char delimiter);
-Dipole initDipole(const string& filename);
+// Global Options object. Declared in Options.h.
+Options o(default_n, default_h, default_eps, default_dynamics);
+
 Dipole doSimulation(const Dipole& freeDipole, Event& event,
                        double h,
                        const int numEvents);
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    fprintf(stderr, "\n");
-    fprintf(stderr, "SYNOPSIS\n");
-    fprintf(stderr, "\tmagphyx [OPTIONS] filename.csv\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "DESCRIPTION\n");
-    fprintf(stderr, "\tmagphyx runs a magnet simulation given initial\n"
-            "\tconditions specified in the second line of filename.csv.\n"
-            "\tfilename.csv is the same format as what is exported from\n"
-            "\tMagPhyx web version. Events are output to events.csv.\n"
-            );
-    fprintf(stderr, "\n");
-    fprintf(stderr, "OPTIONS\n");
-    fprintf(stderr, "\t-n numEvents\n");
-    fprintf(stderr, "\t\tExecutes the simulation until numEvents events "
-            "occur. Default = 1e5.\n");
-    fprintf(stderr, "\t-h h\n");
-    fprintf(stderr, "\t\tInitial step size. Default = 1e-2.\n");
-    fprintf(stderr, "\t-e eps\n");
-    fprintf(stderr, "\t\tError per step allowed. Note that this is error in\n"
-            "\t\tterms of Runge-Kutta. The error in total energy will be\n"
-            "\t\tsimilar to, but not bound by, this value. Default = 1e-10.\n");
-    fprintf(stderr, "\n");
-    return 1;
-  }
+void printUsage() {
+  fprintf(stderr, "\n");
+  fprintf(stderr, "SYNOPSIS\n");
+  fprintf(stderr, "\tmagphyx [OPTIONS] (-i conditions | -f filename)\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "DESCRIPTION\n");
+  fprintf(stderr, 
+          "\tmagphyx runs a magnet simulation given initial conditions\n"
+          "\tspecified by either the -i or -f option. Events are output to\n"
+          "\tevents.csv.\n"
+          );
+  fprintf(stderr, "\n");
+  fprintf(stderr, "OPTIONS\n");
+  fprintf(stderr, "\t-i r theta phi pr ptheta pphi\n");
+  fprintf(stderr, "\t\tInitial conditions.\n");
+  fprintf(stderr, "\t-f filename.csv\n");
+  fprintf(stderr, 
+          "\t\tInitial conditions are found in the second line of\n"
+          "\t\tfilename.csv, which is in the same format as what is\n"
+          "\t\texported from MagPhyx web version.\n"
+          );
+  fprintf(stderr, "\t-d (bouncing | rolling)\n");
+  fprintf(stderr, "\t\tDynamics type. Default = bouncing.\n");
+  fprintf(stderr, "\t-n numEvents\n");
+  fprintf(stderr, 
+          "\t\tExecutes the simulation until numEvents events occur.\n"
+          "\t\tDefault = 1e5.\n");
+  fprintf(stderr, "\t-h h\n");
+  fprintf(stderr, "\t\tInitial step size. Default = 1e-2.\n");
+  fprintf(stderr, "\t-e eps\n");
+  fprintf(stderr, "\t\tError per step allowed. Note that this is error in\n"
+          "\t\tterms of Runge-Kutta. The error in total energy will be\n"
+          "\t\tsimilar to, but not bound by, this value. Default = 1e-10.\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "EXAMPLES\n");
+  fprintf(stderr, "\tmagphyx -n 1e6 -d bouncing -f init.csv\n");
+  fprintf(stderr, "\tmagphyx -d rolling -i 1 3 -18.78982612 0 0 0\n");
+  fprintf(stderr, "\n");
+}
 
+int main(int argc, char** argv) {
   int i = 1;
   bool stop = false;
   while (i < argc && !stop) {
@@ -61,61 +76,18 @@ int main(int argc, char** argv) {
       stop = false;
     }
   }
-  string initFilename = argv[i];
+  if (!o.initialized) {
+    printUsage();
+    return 1;
+  }
 
-  Dipole freeDipole = initDipole(initFilename);
+
+  // Dipole freeDipole = initDipole(initFilename);
+  Dipole freeDipole = o.dipole;
   // cout << freeDipole << endl;
   Event event("events.csv", freeDipole);
   freeDipole = doSimulation(freeDipole, event, o.h, o.numEvents);
   // cout << freeDipole << endl;
-}
-
-Dipole initDipole(const string& filename) {
-  ifstream in(filename);
-  string line;
-  vector<string> tokens;
-
-  // skip header line
-  getline(in, line, '\r');
-  // cout << line << endl;
-  tokens = split(line, ',');
-  if (tokens[0].compare("n") != 0) {
-    throw logic_error("Illegal file");
-  }
-  
-  // first data line
-  getline(in, line, '\r');
-  // cout << line << endl;
-  tokens = split(line, ',');
-  int i = 0;
-  // cout << tokens[i] << endl;
-  int n = stoi(tokens[i++]);
-  string event_type = tokens[i++];
-  double t = stod(tokens[i++]);
-  double r = stod(tokens[i++]);
-  double theta = Physics::deg2rad(stod(tokens[i++]));
-  double phi = Physics::deg2rad(stod(tokens[i++]));
-  double pr = stod(tokens[i++]);
-  double ptheta = stod(tokens[i++]);
-  double pphi = stod(tokens[i++]);
-  double beta = stod(tokens[i++]);
-  double E = stod(tokens[i++]);
-  double dE = stod(tokens[i++]);
-
-  return Dipole(r, theta, phi, pr, ptheta, pphi);
-}
-
-// You could also take an existing vector as a parameter.
-vector<string> split(string str, char delimiter) {
-  vector<string> internal;
-  stringstream ss(str); // Turn the string into a stream.
-  string tok;
-  
-  while(getline(ss, tok, delimiter)) {
-    internal.push_back(tok);
-  }
-  
-  return internal;
 }
 
 void printStateHeader() {
@@ -139,7 +111,7 @@ void printState(const double t, const double h, const Dipole& d,
 }
 
 void printProgress(const int n, const Dipole& d, const bool fired) {
-  if (n % 1000 == 0 && fired) {
+  if (!o.interactive && n % 1000 == 0 && fired) {
     printf("\r");
     printf("Num events = %-7d     dE = %-12e     ", n, d.get_dE());
     fflush(stdout);
@@ -156,6 +128,10 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event,
   int n = 0;
 
   printf("\n");
+  if (o.interactive) {
+    printStateHeader();
+    printState(0, h_, freeDipole);
+  }
   printProgress(0, freeDipole, true);
   for (int i = 0; event.get_n() < numEvents; ++i) {
     try {
@@ -163,6 +139,11 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event,
     } catch (logic_error& e) {
       printState(stepper.t, stepper.h, stepper.d);
       throw e;
+    }
+
+    if (o.interactive) {
+      printState(stepper.t, stepper.h, stepper.d);
+      cin.get();
     }
 
     // Keep theta and phi in the range [-180, 180]

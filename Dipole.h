@@ -21,6 +21,17 @@
 // Dipole has properties r, theta, phi, pr, ptheta, pphi
 class Dipole {
  public:
+  Dipole() {
+    _r = 1.5;
+    _theta = 0;
+    _phi = 0;
+    _pr = 0;
+    _ptheta = 0;
+    _pphi = 0;
+
+    _E0 = get_E();
+  }
+
   Dipole(const double r, const double theta, const double phi,
          const double pr, const double ptheta, const double pphi) {
     _r = r;

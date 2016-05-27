@@ -3,8 +3,11 @@
 
 #include <stdexcept>
 
+#include <gsl/gsl_matrix.h>
+
 #include "./vec.h"
 #include "./Dipole.h"
+#include "./Options.h"
 
 class Physics {
  public:
@@ -47,11 +50,16 @@ class Physics {
     const double cos2 = cos(phi-2*theta);
     const double sin2 = sin(phi-2*theta);
 
-    dxdt[0] = pr;
+    if (o.dynamics == Options::BOUNCING) {
+      dxdt[0] = pr;
+      dxdt[3] = ptheta * ptheta / r3 -
+          (1/(4*r4)) * (cos_phi + 3*cos2);
+    } else {
+      dxdt[0] = 0;
+      dxdt[3] = 0;
+    }
     dxdt[1] = ptheta / r2;
     dxdt[2] = 10 * pphi;
-    dxdt[3] = ptheta * ptheta / r3 -
-        (1/(4*r4)) * (cos_phi + 3*cos2);
     dxdt[4] = (1/(2*r3)) * sin2;
     dxdt[5] = -(1/(12*r3)) * (sin_phi + 3*sin2);
   }

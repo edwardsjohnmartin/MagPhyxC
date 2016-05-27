@@ -19,23 +19,32 @@
 #include <set>
 #include <map>
 
-// #include "./opencl/defs.h"
+#include "./Dipole.h"
 
 //------------------------------------------------------------------------------
 // Options
 //------------------------------------------------------------------------------
 struct Options {
  public:
-  std::vector<std::string> filenames;
+  enum Dynamics { BOUNCING, ROLLING };
+
+ public:
+  bool initialized;
+  Dipole dipole;
+
+  Dynamics dynamics;
   int numEvents;
   double h;
   double eps;
-  bool bool_option;
+  bool interactive;
   std::map<std::string, std::string> key2value;
 
  public:
-  Options(const int numEvents_, const double h_, const double eps_)
-      : numEvents(numEvents_), h(h_), eps(eps_), bool_option(true) {
+  Options(const int numEvents_, const double h_, const double eps_,
+          const Dynamics dynamics_)
+      : initialized(false), dynamics(dynamics_),
+        numEvents(numEvents_), h(h_), eps(eps_),
+        interactive(false) {
     ReadOptionsFile();
   }
 
@@ -54,7 +63,7 @@ struct Options {
 
 };
 
-// Global Options object
-extern Options options;
+// Global Options object. Instantiated in main.cpp.
+extern Options o;
 
 #endif

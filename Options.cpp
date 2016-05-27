@@ -19,18 +19,67 @@
 #endif
 
 #include "./Options.h"
+#include "./Physics.h"
 
 using namespace std;
 
 // Global Options object
 // Options options;
 
+// You could also take an existing vector as a parameter.
+vector<string> split(string str, char delimiter) {
+  vector<string> internal;
+  stringstream ss(str); // Turn the string into a stream.
+  string tok;
+  
+  while(getline(ss, tok, delimiter)) {
+    internal.push_back(tok);
+  }
+  
+  return internal;
+}
+
+Dipole initDipole(const string& filename) {
+  ifstream in(filename);
+  string line;
+  vector<string> tokens;
+
+  // skip header line
+  getline(in, line, '\r');
+  // cout << line << endl;
+  tokens = split(line, ',');
+  if (tokens[0].compare("n") != 0) {
+    throw logic_error("Illegal file");
+  }
+  
+  // first data line
+  getline(in, line, '\r');
+  // cout << line << endl;
+  tokens = split(line, ',');
+  int i = 0;
+  // cout << tokens[i] << endl;
+  const int n = stoi(tokens[i++]);
+  const string event_type = tokens[i++];
+  const double t = stod(tokens[i++]);
+  const double r = stod(tokens[i++]);
+  const double theta = Physics::deg2rad(stod(tokens[i++]));
+  const double phi = Physics::deg2rad(stod(tokens[i++]));
+  const double pr = stod(tokens[i++]);
+  const double ptheta = stod(tokens[i++]);
+  const double pphi = stod(tokens[i++]);
+  const double beta = stod(tokens[i++]);
+  const double E = stod(tokens[i++]);
+  const double dE = stod(tokens[i++]);
+
+  return Dipole(r, theta, phi, pr, ptheta, pphi);
+}
+
 bool Options::ProcessArg(int& i, char** argv) {
   Options& o = *this;
   int orig_i = i;
   if (strcmp(argv[i], "-n") == 0) {
     ++i;
-    o.numEvents = atoi(argv[i]);
+    o.numEvents = (int)atof(argv[i]);
     ++i;
   } else if (strcmp(argv[i], "-h") == 0) {
     ++i;
@@ -40,9 +89,36 @@ bool Options::ProcessArg(int& i, char** argv) {
     ++i;
     o.eps = atof(argv[i]);
     ++i;
-  } else if (strcmp(argv[i], "-b") == 0) {
+  } else if (strcmp(argv[i], "-f") == 0) {
     ++i;
-    o.bool_option = false;
+    o.dipole = initDipole(argv[i]);
+    o.initialized = true;
+    ++i;
+  } else if (strcmp(argv[i], "-i") == 0) {
+    ++i;
+    const double r = atof(argv[i++]);
+    const double theta = Physics::deg2rad(atof(argv[i++]));
+    const double phi = Physics::deg2rad(atof(argv[i++]));
+    const double pr = atof(argv[i++]);
+    const double ptheta = atof(argv[i++]);
+    const double pphi = atof(argv[i++]);
+    o.dipole = Dipole(r, theta, phi, pr, ptheta, pphi);
+    o.initialized = true;
+  } else if (strcmp(argv[i], "-d") == 0) {
+    ++i;
+    if (string(argv[i]) == "bouncing") {
+      o.dynamics = BOUNCING;
+    } else if (string(argv[i]) == "rolling") {
+      o.dynamics = ROLLING;
+    } else {
+      fprintf(stderr, "Illegal value for dynamics type. Legal values are "
+              "\"bouncing\" and \"rolling\"");
+      return false;
+    }
+    ++i;
+  } else if (strcmp(argv[i], "-I") == 0) {
+    ++i;
+    o.interactive = true;
   }
   return i != orig_i;
 }
