@@ -23,18 +23,16 @@ const double default_eps = 1e-10;
 // Global Options object. Declared in Options.h.
 Options o(default_n, default_h, default_eps, default_dynamics);
 
-Dipole doSimulation(const Dipole& freeDipole, Event& event,
-                       double h,
-                       const int numEvents);
+Dipole doSimulation(const Dipole& freeDipole, Event& event);
 
 void printUsage() {
   fprintf(stderr, "\n");
   fprintf(stderr, "SYNOPSIS\n");
-  fprintf(stderr, "\tmagphyx [OPTIONS] (-i conditions | -f filename)\n");
+  fprintf(stderr, "\t./magphyxc [OPTIONS] (-i conditions | -f filename)\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "DESCRIPTION\n");
   fprintf(stderr, 
-          "\tmagphyx runs a magnet simulation given initial conditions\n"
+          "\tmagphyxc runs a magnet simulation given initial conditions\n"
           "\tspecified by either the -i or -f option. Events are output to\n"
           "\tevents.csv.\n"
           );
@@ -48,22 +46,35 @@ void printUsage() {
           "\t\tfilename.csv, which is in the same format as what is\n"
           "\t\texported from MagPhyx web version.\n"
           );
-  fprintf(stderr, "\t-d (bouncing | rolling)\n");
+  fprintf(stderr, "\t-o outFilename\n");
+  fprintf(stderr, "\t\tFilename to output to. Default = output to stdout.\n");
+  fprintf(stderr, "\t-d (bouncing | sliding)\n");
   fprintf(stderr, "\t\tDynamics type. Default = bouncing.\n");
-  fprintf(stderr, "\t-n numEvents\n");
+  fprintf(stderr, "\t--numEvents n\n");
   fprintf(stderr, 
-          "\t\tExecutes the simulation until numEvents events occur.\n"
-          "\t\tDefault = 1e5.\n");
+          "\t\tExecutes the simulation until n events occur. Actual number of\n"
+          "\t\tmay be slightly larger than --numEvents due to intermediate\n"
+          "\t\tsteps for accurate collision states. Default = 1e5.\n");
+  fprintf(stderr, "\t--numSteps n\n");
+  fprintf(stderr, 
+          "\t\tExecutes the simulation for 2^n steps. Default (-1) is to\n"
+          "\t\texecute for a given number of events.\n"
+          "\t\tDefault = -1.\n");
   fprintf(stderr, "\t-h h\n");
   fprintf(stderr, "\t\tInitial step size. Default = 1e-2.\n");
   fprintf(stderr, "\t-e eps\n");
   fprintf(stderr, "\t\tError per step allowed. Note that this is error in\n"
           "\t\tterms of Runge-Kutta. The error in total energy will be\n"
           "\t\tsimilar to, but not bound by, this value. Default = 1e-10.\n");
+  fprintf(stderr, "\t-c\n");
+  fprintf(stderr, "\t\tUse a fixed step size. Default is to use an adaptive\n"
+          "\t\tstep size.\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "EXAMPLES\n");
-  fprintf(stderr, "\tmagphyx -n 1e6 -d bouncing -f init.csv\n");
-  fprintf(stderr, "\tmagphyx -d rolling -i 1 3 -18.78982612 0 0 0\n");
+  fprintf(stderr, "\t./magphyxc --numEvents 1e5 -d bouncing -i 1.5 0 90 0 0 0 -o events.csv\n");
+  fprintf(stderr, "\t./magphyxc --numEvents 1e5 -d bouncing -f init.csv -o events.csv\n");
+  fprintf(stderr, "\t./magphyxc -d sliding -i 1 3 -18.78982612 0 0 0\n");
+  fprintf(stderr, "\t./magphyxc -d sliding --numSteps 10 -i 1 3 -18.78982612 0 0 0\n");
   fprintf(stderr, "\n");
 }
 
@@ -81,13 +92,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-
-  // Dipole freeDipole = initDipole(initFilename);
   Dipole freeDipole = o.dipole;
-  // cout << freeDipole << endl;
-  Event event("events.csv", freeDipole);
-  freeDipole = doSimulation(freeDipole, event, o.h, o.numEvents);
-  // cout << freeDipole << endl;
+  Event event(o.outFilename, freeDipole);
+  doSimulation(freeDipole, event);
 }
 
 void printStateHeader() {
@@ -111,29 +118,42 @@ void printState(const double t, const double h, const Dipole& d,
 }
 
 void printProgress(const int n, const Dipole& d, const bool fired) {
-  if (!o.interactive && n % 1000 == 0 && fired) {
+  if (!o.interactive && (n % 1000 == 0 || n >= o.numEvents) && fired) {
     printf("\r");
     printf("Num events = %-7d     dE = %-12e     ", n, d.get_dE());
     fflush(stdout);
   }
 }
 
-Dipole doSimulation(const Dipole& freeDipole, Event& event,
-                       const double h_,
-                       const int numEvents) {
-  Stepper stepper(freeDipole, h_, o.eps);
+bool keepGoing(const Event& event, const int n) {
+  if (o.numEvents != -1) {
+    return (event.get_n() < o.numEvents);
+  }
+  return (n < o.numSteps);
+}
+
+Dipole doSimulation(const Dipole& freeDipole, Event& event) {
+  const double h_ = o.h;
+  const int numEvents = o.numEvents;
+  const int numSteps = o.numSteps;
+
+  Stepper stepper(freeDipole, h_, o.fixed_h, o.eps);
 
   double t = 0.0;
-
   int n = 0;
+  const bool showProgress = (o.outFilename != "");
 
   printf("\n");
+  event.printHeader();
   if (o.interactive) {
     printStateHeader();
     printState(0, h_, freeDipole);
   }
-  printProgress(0, freeDipole, true);
-  for (int i = 0; event.get_n() < numEvents; ++i) {
+  if (showProgress) {
+    printProgress(0, freeDipole, true);
+  }
+
+  while (keepGoing(event, n)) {
     try {
       stepper.step();
     } catch (logic_error& e) {
@@ -163,14 +183,18 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event,
       }
 
       event.logCollision(stepper.d, stepper.t);
-      printProgress(event.get_n(), stepper.d, true);
+      if (showProgress) {
+        printProgress(event.get_n(), stepper.d, true);
+      }
       // Specular reflection
       stepper.d.set_pr(-stepper.d.get_pr());
 
       stepper.reset();
     } else {
       const bool fired = event.log(stepper.d, stepper.t);
-      printProgress(event.get_n(), stepper.d, fired);
+      if (showProgress) {
+        printProgress(event.get_n(), stepper.d, fired);
+      }
       ++n;
     }
   }
@@ -181,8 +205,10 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event,
   // printState(stepper.t, stepper.h, stepper.d);
 
   printf("\n");
-  printf("Results output to events.csv.\n");
-  printf("\n");
+  if (o.outFilename != "") {
+    printf("Results output to %s\n", o.outFilename.c_str());
+    printf("\n");
+  }
 
   return freeDipole;
 }

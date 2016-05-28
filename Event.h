@@ -5,14 +5,31 @@
 
 class Event {
  public:
-  Event(const std::string& filename, const Dipole& d) : _n(1), _d(d) {
-    _file = fopen(filename.c_str(), "w");
-    fprintf(_file, "n, event_type, t, r, theta, phi,"
-            "pr, ptheta, pphi, beta, E, dE\n");
+  Event(const std::string& filename, const Dipole& d)
+      : _n(1), _d(d) {
+    _isStdout = (filename == "");
+    if (_isStdout) {
+      _file = stdout;
+    } else {
+      _file = fopen(filename.c_str(), "w");
+    }
   }
 
   ~Event() {
-    fclose(_file);
+    if (!_isStdout) {
+      fclose(_file);
+    }
+  }
+
+ private:
+  // disallow copies because destructor closes file
+  void operator=(const Event& e) {
+  }
+
+ public:
+  void printHeader() const {
+    fprintf(_file, "n, event_type, t, r, theta, phi,"
+            "pr, ptheta, pphi, beta, E, dE\n");
   }
 
   int get_n() const { return _n; }
@@ -94,6 +111,7 @@ class Event {
 
  private:
   FILE* _file;
+  bool _isStdout;
   int _n;
   Dipole _d;
 };

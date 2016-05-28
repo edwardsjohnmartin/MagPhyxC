@@ -77,14 +77,22 @@ Dipole initDipole(const string& filename) {
 bool Options::ProcessArg(int& i, char** argv) {
   Options& o = *this;
   int orig_i = i;
-  if (strcmp(argv[i], "-n") == 0) {
+  if (strcmp(argv[i], "--numEvents") == 0) {
     ++i;
     o.numEvents = (int)atof(argv[i]);
+    ++i;
+  } else if (strcmp(argv[i], "--numSteps") == 0) {
+    ++i;
+    o.numSteps = (int)atof(argv[i]);
+    o.numEvents = -1;
     ++i;
   } else if (strcmp(argv[i], "-h") == 0) {
     ++i;
     o.h = atof(argv[i]);
     ++i;
+  } else if (strcmp(argv[i], "-c") == 0) {
+    ++i;
+    o.fixed_h = true;
   } else if (strcmp(argv[i], "-e") == 0) {
     ++i;
     o.eps = atof(argv[i]);
@@ -108,13 +116,17 @@ bool Options::ProcessArg(int& i, char** argv) {
     ++i;
     if (string(argv[i]) == "bouncing") {
       o.dynamics = BOUNCING;
-    } else if (string(argv[i]) == "rolling") {
-      o.dynamics = ROLLING;
+    } else if (string(argv[i]) == "sliding") {
+      o.dynamics = SLIDING;
     } else {
       fprintf(stderr, "Illegal value for dynamics type. Legal values are "
-              "\"bouncing\" and \"rolling\"");
+              "\"bouncing\" and \"sliding\"");
       return false;
     }
+    ++i;
+  } else if (strcmp(argv[i], "-o") == 0) {
+    ++i;
+    outFilename = argv[i];
     ++i;
   } else if (strcmp(argv[i], "-I") == 0) {
     ++i;

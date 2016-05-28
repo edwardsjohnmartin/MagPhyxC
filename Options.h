@@ -26,15 +26,18 @@
 //------------------------------------------------------------------------------
 struct Options {
  public:
-  enum Dynamics { BOUNCING, ROLLING };
+  enum Dynamics { BOUNCING, SLIDING };
 
  public:
   bool initialized;
   Dipole dipole;
 
+  std::string outFilename;
   Dynamics dynamics;
   int numEvents;
+  int numSteps;
   double h;
+  bool fixed_h;
   double eps;
   bool interactive;
   std::map<std::string, std::string> key2value;
@@ -43,7 +46,7 @@ struct Options {
   Options(const int numEvents_, const double h_, const double eps_,
           const Dynamics dynamics_)
       : initialized(false), dynamics(dynamics_),
-        numEvents(numEvents_), h(h_), eps(eps_),
+        numEvents(numEvents_), numSteps(-1), h(h_), fixed_h(false), eps(eps_),
         interactive(false) {
     ReadOptionsFile();
   }

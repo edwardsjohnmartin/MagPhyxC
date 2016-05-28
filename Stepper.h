@@ -22,10 +22,11 @@ int jac(double t, const double y[], double *dfdy, double dfdt[], void *params) {
 
 class Stepper {
  public:
-  Stepper(const Dipole& freeDipole, const double h_, const double eps_abs_) :
+  Stepper(const Dipole& freeDipole, const double h_, const bool fixed_h_,
+          const double eps_abs_) :
       d0(freeDipole), d(freeDipole), eps_abs(eps_abs_), eps_rel(0),
       a_y(1), a_dydt(0), t1(1e100),
-      t(0), h(h_) {
+      t(0), h(h_), _fixed_h(fixed_h_) {
 
     const gsl_odeiv2_step_type* step_type = gsl_odeiv2_step_rk8pd;
     // const gsl_odeiv2_step_type* step_type = gsl_odeiv2_step_bsimp;
@@ -48,6 +49,9 @@ class Stepper {
   }
 
   void stepHalf() {
+    if (_fixed_h) {
+      throw std::logic_error("No binary searching when using a fixed step size.");
+    }
     h = h/2;
     doStep(true);
   }
@@ -74,7 +78,7 @@ class Stepper {
     // d and y are linked!
     double* y = (double*)(&d);
     int status;
-    if (fixed) {
+    if (fixed || _fixed_h) {
       status = gsl_odeiv2_evolve_apply_fixed_step(
           evolve, control, _step, &sys, &t, h, y);
     } else {
@@ -97,6 +101,7 @@ class Stepper {
   gsl_odeiv2_step* _step;
   gsl_odeiv2_control* control;
   gsl_odeiv2_evolve* evolve;
+  const bool _fixed_h;
   const double eps_abs;
   const double eps_rel;
   const double a_y;
