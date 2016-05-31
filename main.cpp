@@ -27,9 +27,13 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event);
 
 void printUsage() {
   fprintf(stderr, "\n");
+
+  // synopsis
   fprintf(stderr, "SYNOPSIS\n");
   fprintf(stderr, "\t./magphyxc [OPTIONS] (-i conditions | -f filename)\n");
   fprintf(stderr, "\n");
+
+  // description
   fprintf(stderr, "DESCRIPTION\n");
   fprintf(stderr, 
           "\tmagphyxc runs a magnet simulation given initial conditions\n"
@@ -37,6 +41,8 @@ void printUsage() {
           "\tevents.csv.\n"
           );
   fprintf(stderr, "\n");
+
+  // options
   fprintf(stderr, "OPTIONS\n");
   fprintf(stderr, "\t-i r theta phi pr ptheta pphi\n");
   fprintf(stderr, "\t\tInitial conditions.\n");
@@ -55,7 +61,7 @@ void printUsage() {
           "\t\tExecutes the simulation until n events occur. Actual number of\n"
           "\t\tmay be slightly larger than --numEvents due to intermediate\n"
           "\t\tsteps for accurate collision states. Default = 1e5.\n");
-  fprintf(stderr, "\t--numSteps n\n");
+  fprintf(stderr, "\t--logOfNumSteps n\n");
   fprintf(stderr, 
           "\t\tExecutes the simulation for 2^n steps. Default (-1) is to\n"
           "\t\texecute for a given number of events.\n"
@@ -69,12 +75,23 @@ void printUsage() {
   fprintf(stderr, "\t-c\n");
   fprintf(stderr, "\t\tUse a fixed step size. Default is to use an adaptive\n"
           "\t\tstep size.\n");
+  fprintf(stderr, "\t-s (theta | phi)\n");
+  fprintf(stderr, "\t\tSingle step output. Output the given state variable\n"
+          "\t\tat every step. Default is to output only on events.\n");
+  fprintf(stderr, "\t--fft\n");
+  fprintf(stderr, "\t\tRun the state variable output through an fft before\n"
+          "\t\toutputting. Only valid together with the -s flag.\n");
   fprintf(stderr, "\n");
+
+  // Examples
   fprintf(stderr, "EXAMPLES\n");
   fprintf(stderr, "\t./magphyxc --numEvents 1e5 -d bouncing -i 1.5 0 90 0 0 0 -o events.csv\n");
+  fprintf(stderr, "\t\tDemo 7 from MagPhyx web version\n");
   fprintf(stderr, "\t./magphyxc --numEvents 1e5 -d bouncing -f init.csv -o events.csv\n");
-  fprintf(stderr, "\t./magphyxc -d sliding -i 1 3 -18.78982612 0 0 0\n");
-  fprintf(stderr, "\t./magphyxc -d sliding --numSteps 10 -i 1 3 -18.78982612 0 0 0\n");
+  fprintf(stderr, "\t\tLoads initial conditions from file\n");
+  fprintf(stderr, "\t./magphyxc -d sliding --logOfNumSteps 10 -s theta -i 1 3 -18.78982612 0 0 0 -c -h 1e-2 --fft -o theta.dat\n");
+  fprintf(stderr, "\t\tRuns 1024 steps of sliding case and outputs the fft\n"
+          "\t\tof the theta values.\n");
   fprintf(stderr, "\n");
 }
 
@@ -93,7 +110,7 @@ int main(int argc, char** argv) {
   }
 
   Dipole freeDipole = o.dipole;
-  Event event(o.outFilename, freeDipole);
+  Event event(o.outFilename, freeDipole, o.singleStep);
   doSimulation(freeDipole, event);
 }
 
@@ -141,7 +158,8 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event) {
 
   double t = 0.0;
   int n = 0;
-  const bool showProgress = (o.outFilename != "");
+  const bool showProgress = (o.outFilename != "" &&
+                             o.singleStep == Options::NONE);
 
   printf("\n");
   event.printHeader();

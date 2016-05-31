@@ -1,12 +1,16 @@
 #ifndef __EVENT_H__
 #define __EVENT_H__
 
+#include <gsl/gsl_fft_real.h>
+
 #include "./Dipole.h"
+#include "./Options.h"
 
 class Event {
  public:
-  Event(const std::string& filename, const Dipole& d)
-      : _n(1), _d(d) {
+  Event(const std::string& filename, const Dipole& d,
+        const Options::StateVariable& singleStep)
+      : _n(1), _d(d), _singleStep(singleStep) {
     _isStdout = (filename == "");
     if (_isStdout) {
       _file = stdout;
@@ -16,9 +20,45 @@ class Event {
   }
 
   ~Event() {
+    if (_singleStep != Options::NONE && _singleStep != Options::ALL) {
+      if (o.fft) {
+        gsl_fft_real_radix2_transform(_ss_v.data(), 1, _ss_v.size());
+        // // Print complex result
+        // const int n = _ss_t.size();
+        // fprintf(_file, "%lf %lf %lf\n", _ss_t[0], _ss_v[0], 0.0);
+        // for (int i = 1; i < n/2; ++i) {
+        //   fprintf(_file, "%lf %lf %lf\n", _ss_t[i], _ss_v[i], _ss_v[n-i]);
+        // }
+        // fprintf(_file, "%lf %lf %lf\n", _ss_t[n/2], _ss_v[n/2], 0.0);
+        // for (int i = n/2+1; i < n; ++i) {
+        //   fprintf(_file, "%lf %lf %lf\n", _ss_t[i], _ss_v[n-i], -_ss_v[i]);
+        // }
+        // Print power spectrum
+        const int n = _ss_t.size();
+        fprintf(_file, "%lf %lf\n", _ss_t[0], sq(_ss_v[0], 0));
+        for (int i = 1; i < n/2; ++i) {
+          fprintf(_file, "%lf %lf\n", _ss_t[i], sq(_ss_v[i], _ss_v[n-i]));
+        }
+        fprintf(_file, "%lf %lf\n", _ss_t[n/2], sq(_ss_v[n/2], 0.0));
+        for (int i = n/2+1; i < n; ++i) {
+          fprintf(_file, "%lf %lf\n", _ss_t[i], sq(_ss_v[n-i], -_ss_v[i]));
+        }
+      } else {
+        for (int i = 0; i < _ss_t.size(); ++i) {
+          fprintf(_file, "%lf %lf\n", _ss_t[i], _ss_v[i]);
+        }
+      }
+    }
+
     if (!_isStdout) {
       fclose(_file);
     }
+  }
+
+  // Returns the square of the complex number a+ib where the square
+  // is (a+ib)x(a+ib)* where * denotes the conjugate.
+  static inline double sq(const double a, const double b) {
+    return a*a+b*b;
   }
 
  private:
@@ -28,13 +68,27 @@ class Event {
 
  public:
   void printHeader() const {
-    fprintf(_file, "n, event_type, t, r, theta, phi,"
-            "pr, ptheta, pphi, beta, E, dE\n");
+    if (_singleStep == Options::NONE || _singleStep == Options::ALL) {
+      fprintf(_file, "n, event_type, t, r, theta, phi,"
+              "pr, ptheta, pphi, beta, E, dE\n");
+    }
   }
 
   int get_n() const { return _n; }
 
   bool log(const Dipole& new_d, const double t) {
+    if (_singleStep != Options::NONE) {
+      _ss_t.push_back(t);
+      if (_singleStep == Options::THETA) {
+        _ss_v.push_back(new_d.get_theta());
+      } else if (_singleStep == Options::PHI) {
+        _ss_v.push_back(new_d.get_phi());
+      } else if (_singleStep == Options::ALL) {
+        event("step", new_d, t);
+      }
+      return true;
+    }
+
     bool fired = false;
     // Log zero crossings
     if (isZeroCrossing(_d.get_theta(), new_d.get_theta())) {
@@ -78,6 +132,11 @@ class Event {
   }
 
   void logCollision(const Dipole& new_d, const double t) {
+    if (_singleStep != Options::NONE) {
+      throw std::logic_error("Collision events should not occur in single step "
+                             "mode");
+    }
+
     event("collision", new_d, t);
     _d = new_d;
   }
@@ -114,6 +173,10 @@ class Event {
   bool _isStdout;
   int _n;
   Dipole _d;
+  const Options::StateVariable _singleStep;
+  // Single-step t and variable values.
+  std::vector<double> _ss_t;
+  std::vector<double> _ss_v;
 };
 
 #endif

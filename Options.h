@@ -27,6 +27,7 @@
 struct Options {
  public:
   enum Dynamics { BOUNCING, SLIDING };
+  enum StateVariable { NONE, R, THETA, PHI, ALL };
 
  public:
   bool initialized;
@@ -36,17 +37,20 @@ struct Options {
   Dynamics dynamics;
   int numEvents;
   int numSteps;
+  bool fft;
   double h;
   bool fixed_h;
   double eps;
   bool interactive;
+  StateVariable singleStep;
   std::map<std::string, std::string> key2value;
 
  public:
   Options(const int numEvents_, const double h_, const double eps_,
           const Dynamics dynamics_)
       : initialized(false), dynamics(dynamics_),
-        numEvents(numEvents_), numSteps(-1), h(h_), fixed_h(false), eps(eps_),
+        numEvents(numEvents_), numSteps(-1), fft(false),
+        h(h_), fixed_h(false), eps(eps_),
         interactive(false) {
     ReadOptionsFile();
   }

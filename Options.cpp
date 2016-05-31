@@ -81,9 +81,9 @@ bool Options::ProcessArg(int& i, char** argv) {
     ++i;
     o.numEvents = (int)atof(argv[i]);
     ++i;
-  } else if (strcmp(argv[i], "--numSteps") == 0) {
+  } else if (strcmp(argv[i], "--logOfNumSteps") == 0) {
     ++i;
-    o.numSteps = (int)atof(argv[i]);
+    o.numSteps = (int)pow(2, (int)atof(argv[i]));
     o.numEvents = -1;
     ++i;
   } else if (strcmp(argv[i], "-h") == 0) {
@@ -102,6 +102,9 @@ bool Options::ProcessArg(int& i, char** argv) {
     o.dipole = initDipole(argv[i]);
     o.initialized = true;
     ++i;
+  } else if (strcmp(argv[i], "--fft") == 0) {
+    ++i;
+    o.fft = true;
   } else if (strcmp(argv[i], "-i") == 0) {
     ++i;
     const double r = atof(argv[i++]);
@@ -127,6 +130,20 @@ bool Options::ProcessArg(int& i, char** argv) {
   } else if (strcmp(argv[i], "-o") == 0) {
     ++i;
     outFilename = argv[i];
+    ++i;
+  } else if (strcmp(argv[i], "-s") == 0) {
+    ++i;
+    if (string(argv[i]) == "theta") {
+      o.singleStep = THETA;
+    } else if (string(argv[i]) == "phi") {
+      o.singleStep = PHI;
+    } else if (string(argv[i]) == "all") {
+      o.singleStep = ALL;
+    } else {
+      fprintf(stderr, "Illegal value for single step state value."
+              "Legal values are \"theta\" and \"phi\"");
+      return false;
+    }
     ++i;
   } else if (strcmp(argv[i], "-I") == 0) {
     ++i;
