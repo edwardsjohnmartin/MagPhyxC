@@ -75,9 +75,10 @@ void printUsage() {
   fprintf(stderr, "\t-c\n");
   fprintf(stderr, "\t\tUse a fixed step size. Default is to use an adaptive\n"
           "\t\tstep size.\n");
-  fprintf(stderr, "\t-s (theta | phi)\n");
+  fprintf(stderr, "\t-s (theta | phi | all)\n");
   fprintf(stderr, "\t\tSingle step output. Output the given state variable\n"
-          "\t\tat every step. Default is to output only on events.\n");
+          "\t\t(or all state variables) at every step. Default is to output\n"
+          "\t\tonly on events.\n");
   fprintf(stderr, "\t--fft\n");
   fprintf(stderr, "\t\tRun the state variable output through an fft before\n"
           "\t\toutputting. Only valid together with the -s flag.\n");
@@ -185,8 +186,8 @@ Dipole doSimulation(const Dipole& freeDipole, Event& event) {
     }
 
     // Keep theta and phi in the range [-180, 180]
-    stepper.d.set_theta(Physics::rotate(stepper.d.get_theta()));
-    stepper.d.set_phi(Physics::rotate(stepper.d.get_phi()));
+    stepper.d.set_theta(Physics::normalizeAngle(stepper.d.get_theta()));
+    stepper.d.set_phi(Physics::normalizeAngle(stepper.d.get_phi()));
     if (stepper.d.get_r() < 1) {
       // Handle collision. Iterate until we get close enough to reflect.
       stepper.undo();

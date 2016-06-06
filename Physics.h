@@ -19,9 +19,9 @@ class Physics {
     return a * 180.0 / M_PI;
   }
 
-  // Rotates an angle until its in the range [-180, 180].
+  // Rotates an angle until it's in the range [-180, 180].
   // a is in radians.
-  static inline double rotate(double a) {
+  static inline double normalizeAngle(double a) {
     while (a > M_PI) a -= 2*M_PI;
     while (a < -M_PI) a += 2*M_PI;
     return a;
@@ -58,6 +58,18 @@ class Physics {
       dxdt[0] = 0;
       dxdt[3] = 0;
     }
+
+    // This doesn't work yet. GSL does multiple intermediate steps and it's
+    // possible that it hits exactly r=1 and stops instead of reflecting.
+    // if (r == 1 && pr <= 0) {
+    //   dxdt[0] = 0;
+    //   dxdt[3] = 0;
+    // } else {
+    //   dxdt[0] = pr;
+    //   dxdt[3] = ptheta * ptheta / r3 -
+    //       (1/(4*r4)) * (cos_phi + 3*cos2);
+    // }
+
     dxdt[1] = ptheta / r2;
     dxdt[2] = 10 * pphi;
     dxdt[4] = (1/(2*r3)) * sin2;
